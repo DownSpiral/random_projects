@@ -401,8 +401,9 @@ if options[:is_server]
     starting_player
   )
 else
+  puts "Connecting on #{options[:server_ip]}:#{options[:port]}"
   while socket.nil?
-    socket = TCPSocket.new options[:ip], options[:port] rescue nil
+    socket = TCPSocket.new options[:server_ip], options[:port] rescue nil
     break unless socket.nil?
     puts "Server not up. Waiting 5 seconds and then trying again."
     sleep 5

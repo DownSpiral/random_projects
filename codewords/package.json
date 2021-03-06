@@ -1,0 +1,11 @@
+{
+  "name": "codewords",
+  "version": "0.0.1",
+  "description": "codewords - word association game",
+  "dependencies": {
+    "express": "^4.10.2",
+    "socket.io": "^1.3.5",
+    "underscore": "^1.8.3",
+    "randomstring": "1.0.5"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "Homonyminizer",
+  "version": "1.0",
+  "manifest_version": 2,
+  "description": "Converts almost every word that has a homonym to one of its homonyms.",
+  "content_scripts": [ {
+    "all_frames": true,
+    "js": [ "jquery.min.js", "homonyms.js", "content.js" ],
+    "matches": [ "http://*/*", "https://*/*" ] 
+  } ]
+}

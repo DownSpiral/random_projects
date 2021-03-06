@@ -1,0 +1,14 @@
+{
+  "name": "snek",
+  "version": "1.0.0",
+  "description": "Share coords on slither.io",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "socket.io": "^1.7.3"
+  }
+}

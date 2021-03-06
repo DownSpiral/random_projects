@@ -1,0 +1,98 @@
+<html>
+  <body>
+    <div class="Container">
+      <div class="TopBar">
+        <input class="Password" placeholder="Password" id="password">
+        <button onclick="encrypt()">Encrypt</button>
+        <button onclick="decrypt()">Decrypt</button>
+      </div>
+      <div><textarea id="message" class="Message" placeholder="Message"></textarea></div>
+    </div>
+  </body>
+  <style>
+    div.Container { margin: 10px, width: 100%, height: 100% }
+    div.TopBar { margin-bottom: 10px }
+    input {
+      width: 80%;
+      font-size: 1em;
+    }
+    textarea {
+      height: 60%;
+      width: 100%;
+      font-size: 1em;
+    }
+  </style>
+  <script>
+    function shuffle(array, rng) {
+        let counter = array.length;
+
+        // While there are elements in the array
+        while (counter > 0) {
+            // Pick a random index
+            let index = Math.floor(rng() * counter);
+
+            // Decrease counter by 1
+            counter--;
+
+            // And swap the last element with it
+            let temp = array[counter];
+            array[counter] = array[index];
+            array[index] = temp;
+        }
+
+        return array;
+    }
+    function seeded_random(seed) {
+      var _seed = seed;
+      return function() {
+        var x = Math.sin(_seed++) * 10000;
+        return x - Math.floor(x);
+      }
+    }
+    function char_map(seed, encode) {
+      let characters = [];
+      for (let i = 0; i < 256; i++ ) {
+        characters.push(i);
+      }
+      let rng = seeded_random(seed);
+      let mixed_chars = shuffle(characters, rng);
+
+      let mapping = {};
+      let shift_val = (encode ? 1 : -1);
+      let num_chars = mixed_chars.length;
+      for (let i = 0; i < num_chars; i++) {
+        let mod_val = (((i+shift_val)%num_chars)+(num_chars))%num_chars;
+        mapping[mixed_chars[i]] = mixed_chars[mod_val];
+      }
+      return mapping;
+    }
+    function get_seed_from_password() {
+      let password = document.getElementById("password").value;
+      let seed = 0;
+      for (let i = 0; i < password.length; i++) {
+        seed = seed ^ (password.charCodeAt(i) * password.charCodeAt(i) * (i+1));
+      }
+      return seed;
+    }
+    function crypt(message, encode) {
+      let mapping = char_map(get_seed_from_password(), encode);
+      let new_message = "";
+      for (let i = 0; i < message.length; i++) {
+        let char_code = message.charCodeAt(i);
+        let new_char_code = mapping[char_code];
+        if (new_char_code) {
+          new_message += String.fromCharCode(new_char_code);
+        }
+      }
+      return new_message;
+    }
+    function encrypt() {
+      let message = document.getElementById("message").value;
+      document.getElementById("message").value = crypt(message, true);
+    }
+    function decrypt() {
+      let message = document.getElementById("message").value;
+      document.getElementById("message").value = crypt(message, false);
+    }
+  </script>
+</html>

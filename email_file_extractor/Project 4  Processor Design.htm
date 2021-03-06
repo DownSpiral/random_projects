@@ -1,0 +1,997 @@
+
+<!-- saved from url=(0060)http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/ -->
+<html xmlns="http://www.w3.org/1999/xhtml"><head><meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+<title>Project 4: Processor Design</title>
+  <link rel="stylesheet" type="text/css" media="screen" href="./Project 4  Processor Design_files/style.css">
+<script language="javascript">
+function toggle(n) {
+	var names = new Array("Register File","Arithmetic Logic Unit (ALU)","Processor","Data Memory","Output Devices","Test Code","Extra for Experts");
+	var l = document.getElementById("deliv"+n+"link");
+	var b = document.getElementById("deliv"+n+"body");
+	//alert(b.innerHTML);
+	if(b.style.display == "block") {
+		b.style.display = "none";
+		l.innerHTML = names[n] + " [show]";
+	} else {
+		b.style.display = "block";
+		l.innerHTML = names[n] + " [hide]";
+	}
+}
+</script>
+<!-- <style type="text/css"> -->
+<style type="text/css">
+.toggle {font-weight: bold; text-decoration: none;}
+</style> 
+</head>
+
+<body>
+<div class="header" id="cs61c-project-4">
+<h1>Project 4: Processor Design</h1>
+</div>
+<div class="content">
+<h2>CS61C Fall 2011</h2>
+	
+<h3>Due Sunday, November 27, 2011 at 11:59 PM</h3>
+<h3>TA in charge: Anirudh Todi</h3>
+<p>Based on original spec by Ben Sussman and Brian Zimmer, and modified spec of Albert Chae, Paul Pearce, Noah Johnson, Justin Hsia and Conor Hughes.<br>
+Much thanks to Conor Hughes for an excellent assembler and autograder.</p>
+<p>Post any questions or comments to Piazza.</p>
+
+<p style="color: red;">
+This project spec is ridiculously long, <b>but don't fret!</b>
+We've spelled out many things in excruciating detail, so if you just take things one-by-one, it won't be as bad as it looks.
+</p>
+<p>We are also providing a set of <a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/inbrief.html">abridged project notes</a> to look at.  These will NOT substitute for reading through the actual project specs, but can be used as a quick reference later on.</p>
+
+
+
+<hr>
+Updates |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#overview">Overview</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#deliverables">Deliverables</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#isa">ISA</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#logisim">Logisim</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#testing">Testing</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#submit">Submission</a>
+<hr>
+<a name="updates"></a>
+<h2>Updates and Clarifications</h2>
+<ul>
+  <li><b></b><p style="color: red;"><b>11/18: </b>Project 4 will not be graded face-to-face! It will be graded like any other project. You still have only two slip days however.</p></li>
+  <li><b>11/18: </b>The lab after Thanksgiving will be a catch-up lab in case you need to get any labs checked-off.</li>
+  <li><b>11/18: </b>I will be holding extra Office Hours for Project 4 on Monday - November 21 in 330 Soda from 3-4PM</li>
+  <li><b>11/18: </b>All projects are weighted equally</li>
+  <li><b>11/12: </b>I know you just finished up with Project 3, but don't get too complacent because there are a lot of parts to this project!</li>
+</ul>
+
+
+
+<hr>
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#updates">Updates</a> |
+Overview |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#deliverables">Deliverables</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#isa">ISA</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#logisim">Logisim</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#testing">Testing</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#submit">Submission</a>
+<hr>
+<a name="overview"></a>
+<h2>Overview</h2>
+
+<ul>
+  <li>This is an INDIVIDUAL project.</li>
+  <li><del>This project will be graded face-to-face in lab on Wednesday, November 30. More instructions to follow.</del></li>
+  <li>You can use a maximum of two slip days for this project!</li>
+  <li>Tarball of sample tests for a completed CPU have been included in the proj4StartKit.  Look at the README file for usage info. The sample tests can be run if you are physically using one of the machines in SDH 200.  They cannot, however, be run remotely on a SDH 200 machine due to tunneling issues.  They also run fine on the Solaris instructional machines.</li>
+  <li>You are allowed to use any of Logisim's built-in blocks for all parts of this project.</li>
+</ul>
+<p>
+In this project you will be using <a href="http://ozark.hendrix.edu/~burch/logisim/">Logisim</a> to create a 16-bit two-cycle processor.
+It is similar to MIPS, except that both the datapath and the instructions are 16-bits wide, it has only 4 registers, and memory addresses represent 16-bit words instead of 8-bit bytes (word-addressed instead of byte-addressed).
+</p>
+<p>
+Please read this document <i>CAREFULLY</i> as there are key differences between the processor we studied in class and the processor you will be designing for this project.
+</p>
+<p>Before you begin, copy the start kit to your home directory (and then possibly to your own machine):</p>
+<pre>    $ cp -r ~cs61c/proj4StartKit ~/proj4
+</pre>
+        
+
+<h3>Pipelining</h3>
+<p> Your processor will have a 2-stage pipeline:</p>
+<ol>
+  <li><b>Instruction Fetch:</b> An instruction is fetched from the instruction memory.</li>
+  <li><b>Execute:</b> The instruction is decoded, executed, and committed (written back). This is a combination of the remaining stages of a normal MIPS pipeline.</li>
+</ol>
+<p>
+You should note that data hazards do NOT pose a problem for this design, since all accesses to all sources of data happens only in a single pipeline stage.
+However, there are still control hazards to deal with.
+<font color="red">Our ISA does not expose branch delay slots to software.</font>
+This means that the instruction immediately after a branch or jump is not necessarily executed if the branch is taken.
+This makes your task a bit more complex.
+By the time you have figured out that a branch or jump is in the execute stage, you have already accessed the instruction memory and pulled out (possibly) the wrong instruction.
+You will therefore need to "kill" instructions that are being fetched if the instruction under execution is a jump or a taken branch.
+<font color="red">Instruction kills for this project MUST be accomplished by MUXing a <tt>nop</tt> into the instruction stream and sending the <tt>nop</tt> into the Execute stage instead of using the fetched instruction.
+Notice that 0x0000 is a <tt>nop</tt> instruction; please use this, as it will simplify grading and testing.</font>
+You should only kill if a branch is taken (do not kill otherwise), but do kill on every type of jump.
+</p>
+<p>
+Because all of the control and execution is handled in the Execute stage, <b>your processor should be more or less indistinguishable from a single-cycle implementation, barring the one-cycle startup latency and the branch/jump delays.</b>
+However, we will be enforcing the two-pipeline design.
+If you are unsure about pipelining, it is perfectly fine (maybe even recommended) to first implement a single-cycle processor.
+This will allow you to first verify that your instruction decoding, control signals, arithmetic operations, and memory accesses are all working properly.
+From a single-cycle processor you can then split off the Instruction Fetch stage with a few additions and a few logical tweaks.
+Some things to consider:
+</p>
+<ul>
+  <li>Will the IF and EX stages have the same or different <tt>PC</tt> values?</li>
+  <li>Do you need to store the <tt>PC</tt> between the pipelining stages?</li>
+  <li>To MUX a <tt>nop</tt> into the instruction stream, do you place it <i>before</i> or <i>after</i> the instruction register?</li>
+  <li>What address should be requested next while the EX stage executes a <tt>nop</tt>?  Is this different than normal?</li>
+</ul>
+<p>
+You might also notice a bootstrapping problem here: during the first cycle, the instruction register sitting between the pipeline stages won't contain an instruction loaded from memory.
+How do we deal with this?
+It happens that Logisim automatically sets registers to zero on reset; the instruction register will then contain a <tt>nop</tt> (you can consider this start-up a CPU stall).
+We will allow you to depend on this behavior of Logisim.
+Remember to go to Simulate <tt>--&gt;</tt> Reset Simulation (Ctrl+R) to reset your processor.
+</p>
+
+
+
+<hr>
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#updates">Updates</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#overview">Overview</a> |
+Deliverables |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#isa">ISA</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#logisim">Logisim</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#testing">Testing</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#submit">Submission</a>
+<hr>
+<a name="deliverables"></a>
+<h2>Deliverables</h2>
+
+<p>Approach this project like you would any coding assignment: construct it piece by piece and test each component early and often!</p>
+<p><b>Tidyness and readability (i.e. labeling, neat wiring) is much appreciated by the graders, and a portion of your grade will reflect this.</b></p>
+
+
+
+<h3>1) <a id="deliv0link" class="toggle" href="javascript:toggle(0);">Register File [show]</a></h3>
+<div id="deliv0body" style="display: none">
+<p>
+You will design a register file to manage the four 16-bit registers in our ISA.
+After being told to write data to a particular register, you will be able to retrieve that data by asking for the value of that register on subsequent clock cycles.
+We are NOT giving special treatment to the zero register.
+That is, you are allowed to write to <tt>$r0</tt>.
+</p>
+<p>
+You are provided with the skeleton of a register file in <tt>Regfile.circ</tt>.
+The register file circuit has six inputs:
+</p>
+
+<table border="1">
+  <tbody><tr style="font-weight: bold;">
+    <td width="105">Input Name
+    </td><td width="50">Bit Width
+    </td><td>Description
+  </td></tr><tr>
+    <td>CLK
+    </td><td>1
+    </td><td>Input for the clock. This can be sent into subcircuits or attached directly to the clock inputs of memory units in Logisim, but should <em>not</em> otherwise be gated (i.e., do not invert it, do not and it with anything, etc.).
+  </td></tr><tr>
+    <td>RegWrite
+    </td><td>1
+    </td><td>Determines whether data is written on the next rising edge of the clock.
+  </td></tr><tr>
+    <td>Read Register 1
+    </td><td>2
+    </td><td>Determines which register's value is sent to the Read Data 1 output, see below.
+  </td></tr><tr>
+    <td>Read Register 2
+    </td><td>2
+    </td><td>Determines which register's value is sent to the Read Data 2 output, see below.
+  </td></tr><tr>
+    <td>Write Register
+    </td><td>2
+    </td><td>Determines which register to set to Write Data on the next rising edge of the clock, assuming that RegWrite is asserted.
+  </td></tr><tr>
+    <td>Write Data
+    </td><td>16
+    </td><td>Determines what data to write to the register identified by the Write Register input on the next rising edge of the clock, assuming that RegWrite is asserted.
+</td></tr></tbody></table>
+        
+<p> The register file also has the following six outputs:</p>
+
+<table border="1">
+  <tbody><tr style="font-weight: bold;">
+    <td width="105">Output Name
+    </td><td width="50">Bit Width
+    </td><td>Description
+  </td></tr><tr>
+    <td>Reg 0 Value
+    </td><td>16
+    </td><td>Always driven with the value of register 0. This is primarily for grading &amp; debugging; if you were really designing a register file you would probably omit this output.
+  </td></tr><tr>
+    <td>Reg 1 Value
+    </td><td>16
+    </td><td>Always driven with the value of register 1. This is primarily for grading &amp; debugging; if you were really designing a register file you would probably omit this output.
+  </td></tr><tr>
+    <td>Reg 2 Value
+    </td><td>16
+    </td><td>Always driven with the value of register 2. This is primarily for grading &amp; debugging; if you were really designing a register file you would probably omit this output.
+  </td></tr><tr>
+    <td>Reg 3 Value
+    </td><td>16
+    </td><td>Always driven with the value of register 3. This is primarily for grading &amp; debugging; if you were really designing a register file you would probably omit this output.
+  </td></tr><tr>
+    <td>Read Data 1
+    </td><td>16 </td><td>Driven with the value of the register identified by the Read Register 1 input.
+  </td></tr><tr>
+    <td>Read Data 2
+    </td><td>16
+    </td><td>Driven with the value of the register identified by the Read Register 2 input.
+</td></tr></tbody></table>
+
+<p>
+You can make any modifications to <tt>Regfile.circ</tt> you want, but the outputs must obey the behavior specified above.
+In addition, your <tt>Regfile.circ</tt> that you submit <em><font color="red">must</font></em> fit into the <tt>Regfile-harness.circ</tt> file we have provided for you.
+This means that you should take care to not reorder inputs or outputs, though you can move them around if you need more space or something.
+A circuit like <tt>Regfile-harness.circ</tt> will be used to test your register file for grading.
+You should download a fresh copy of <tt>Regfile-harness.circ</tt> and make sure your <tt>Regfile.circ</tt> is cleanly loaded before submitting.
+</p>
+</div>
+
+
+<h3>2) <a id="deliv1link" class="toggle" href="javascript:toggle(1);">Arithmetic Logic Unit (ALU) [show]</a></h3>
+<div id="deliv1body" style="display: none">
+<p>
+<b>Note: Hopefully, you can just drop the ALU you designed in Lab 11 into this project. However, the TA/Lab Assistant may not have tested everything while checking you off. It is your responsibility to make sure everything works for this project! Also, the Lab had you create an unsigned overflow output too - this is not needed by this project!</b></p>
+<p>You will also design an ALU that your processor will use to do math.
+You will tell your ALU what operation to perform and it will drive its output with the result of that operation.
+<b>You ARE allowed to use all of Logisim's built-in arithmetic blocks, including adder, subtractor, and shifter.</b>
+Alternatively, feel free to use any sub-circuit that you created previously for homework or lab.
+</p>
+<p>We have provided a skeleton of an ALU for you in <tt>alu.circ</tt>. It has three inputs:</p>
+ 
+<table border="1">
+  <tbody><tr style="font-weight: bold;">
+    <td width="105">Input Name
+    </td><td width="50">Bit Width
+    </td><td>Description
+  </td></tr><tr>
+    <td>X
+    </td><td>16
+    </td><td>Data to use for X in the ALU operation.
+  </td></tr><tr>
+    <td>Y
+    </td><td>16
+    </td><td>Data to use for Y in the ALU operation.
+  </td></tr><tr>
+    <td>Select (S)
+    </td><td>3
+    </td><td>Selects what operation the ALU should perform (see below).
+</td></tr></tbody></table>
+ 
+<p>The ALU also has three outputs:</p>
+        
+<table border="1">
+  <tbody><tr style="font-weight: bold;">
+    <td width="105">Output Name
+    </td><td width="50">Bit Width
+    </td><td>Description
+  </td></tr><tr>
+    <td>Signed Overflow
+    </td><td>1
+    </td><td>High iff the operation was an addition or subtraction, and there was signed overflow.
+  </td></tr><tr>
+    <td>Result
+    </td><td>16
+    </td><td>Result of the ALU operation.
+  </td></tr><tr>
+    <td>Equal
+    </td><td>1
+    </td><td>High iff the two inputs X and Y are equal.
+</td></tr></tbody></table>
+        
+<p>The operation you should perform is given by the following table:</p>
+        
+<table border="1">
+  <tbody><tr>
+    <th width="50">Select</th>
+    <th>Operation</th>
+  </tr><tr>
+    <td align="center">0
+    </td><td align="left"><tt>or: &nbsp; result = X | Y</tt>
+  </td></tr><tr>
+    <td align="center">1
+    </td><td align="left"><tt>and:&nbsp; result = X &amp; Y</tt>
+  </td></tr><tr>
+    <td align="center">2
+    </td><td align="left"><tt>add:&nbsp; result = X + Y</tt>
+  </td></tr><tr>
+    <td align="center">3
+    </td><td align="left"><tt>sub:&nbsp; result = X - Y</tt>
+  </td></tr><tr>
+    <td align="center">4
+    </td><td align="left"><tt>sllv: result = X &lt;&lt; Y</tt>
+  </td></tr><tr>
+    <td align="center">5
+    </td><td align="left"><tt>srlv: result = X &gt;&gt; Y</tt> (zero-fill)
+  </td></tr><tr>
+    <td align="center">6
+    </td><td align="left"><tt>srav: result = X &gt;&gt; Y</tt> (sign-fill)
+  </td></tr><tr>
+    <td align="center">7
+    </td><td align="left"><tt>slt:&nbsp; result = (X &lt; Y) ? 1 : 0</tt> (treat X and Y as <em>signed</em>)
+</td></tr></tbody></table>
+
+<p><b>Note:</b>  You can assume for shift operations that Y will be non-negative and less than 16.</p>
+        
+<p>
+Follow the same instructions as the register file regarding rearranging inputs and outputs of the ALU.
+In particular, you should ensure that your ALU is correctly loaded by a fresh copy of <tt>alu-harness.circ</tt> before you submit.
+</p>
+</div>
+
+
+<h3>3) <a id="deliv2link" class="toggle" href="javascript:toggle(2);">Processor [show]</a></h3>
+<div id="deliv2body" style="display: none">
+<p>
+We have provided a skeleton for your processor in <tt>cpu.circ</tt> along with a testing harness in <tt>cpu-harness.circ</tt>.
+Your completed processor should implement the ISA detailed below in the section <a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#isa">Instruction Set Architecture (ISA)</a> using a two-cycle pipeline.
+Your processor will contain an instance of both your ALU and your Register File.
+In addition, you will be constructing the Data Memory and Outputs (Deliverables 3a and 3b below) as well as the entire datapath and control from scratch.
+It will interact with our harness through 2 inputs and 10 outputs.
+</p>
+<p>
+Your processor will get its program from the processor harness we have provided.
+It will send the address of instruction memory it wants to access to the harness through an output, and accept the instruction at that address as an input.
+Inspect <tt>cpu-harness.circ</tt> to see exactly what's going on.
+Your processor has 2 inputs that come from the harness.
+</p>
+        
+<table border="1">
+  <tbody><tr style="font-weight: bold;">
+    <td width="105">Input Name
+    </td><td width="50">Bit Width
+    </td><td>Description
+  </td></tr><tr> 
+    <td>From Instr Mem
+    </td><td>16
+    </td><td>Driven with the instruction at the instruction memory address identified by the "To Instr Mem" output (see below).
+  </td></tr><tr>
+    <td>CLK
+    </td><td>1
+    </td><td>The input for the clock. As with the register file, this can be sent into subcircuits (e.g. the CLK input for your register file) or attached directly to the clock inputs of memory units in Logisim, but should <em>not</em> otherwise be gated (i.e., do not invert it, do not and it with anything, etc.).
+</td></tr></tbody></table>
+        
+<p>Your processor must provide 10 outputs to the harness:</p>
+        
+<table border="1">
+  <tbody><tr style="font-weight: bold;">
+    <td width="105">Output Name
+    </td><td width="50">Bit Width
+    </td><td>Description
+  </td></tr><tr>
+    <td>R0
+    </td><td>16
+    </td><td>Driven with the contents of register 0.
+  </td></tr><tr>
+    <td>R1
+    </td><td>16
+    </td><td>Driven with the contents of register 1.
+  </td></tr><tr>
+    <td>R2
+    </td><td>16
+    </td><td>Driven with the contents of register 2.
+  </td></tr><tr>
+    <td>R3
+    </td><td>16
+    </td><td>Driven with the contents of register 3.
+  </td></tr><tr>
+    <td>D0
+    </td><td>16
+    </td><td>Driven with the value being displayed on the first display.
+  </td></tr><tr>
+    <td>D1
+    </td><td>16
+    </td><td>Driven with the value being displayed on the second display.
+  </td></tr><tr>
+    <td>To Instr Mem
+    </td><td>16
+    </td><td>This output is used to select which instruction is presented to the processor on the "From Instr Mem" input.
+  </td></tr><tr>
+    <td>Data Mem Data
+    </td><td>16
+    </td><td>Driven with the data being written to memory. When no data is being written to memory, this can be driven with whatever you want.
+  </td></tr><tr>
+    <td>Data Mem Addr
+    </td><td>16
+    </td><td>Driven with the address being written in memory. When no data is being written to memory, this can be driven with whatever you want.
+  </td></tr><tr>
+    <td>Data Mem Write
+    </td><td>1
+    </td><td>High when data is going to be written to memory. Low otherwise.
+  <!-- <tr> -->
+  <!--   <td>CPU Stall -->
+  <!--   <td>1 -->
+  <!--   <td>High when the CPU is stalling (executing a <tt>nop</tt>).  Low otherwise. -->
+</td></tr></tbody></table>
+
+<p>
+Follow the same instructions as the register file and ALU regarding rearranging inputs and outputs of the processor.
+In particular, you should ensure that your processor is correctly loaded by a fresh copy of <tt>cpu-harness.circ</tt> before you submit.
+</p>
+</div>
+
+
+<h3>3a) <a id="deliv3link" class="toggle" href="javascript:toggle(3);">Data Memory [show]</a></h3>
+<div id="deliv3body" style="display: none">
+<p>
+You will build your Data Memory on your own using a RAM module.
+Note that this is different than the Instruction Memory, which is implemented in the CPU harness using a ROM module.
+Logisim RAM modules can be found in the built-in Memory library/folder.
+</p>
+<p>
+You Data Memory should be located in the top level of <tt>cpu.circ</tt> and connected to the appropriate processor outputs.
+It will not be tested separately in a harness file like the previous three deliverables, but obviously correct function is required for your processor to work.
+</p>
+        
+<img src="./Project 4  Processor Design_files/ram0.png" width="381" height="205">
+<img src="./Project 4  Processor Design_files/ram1.png" width="381" height="205">
+
+<p>
+For those unfamiliar with the RAM module, the pictures above show a good way to wire up a circuit to use RAM.
+You are not required to implement Data Memory as shown above and you can use a memory with separate read and write ports if you should so desire.
+</p>
+<p>Here are a few things to know about the RAM module before you get started:</p>
+
+<ul>
+  <li>"clk" provides synchronization for memory writes. Be sure to use the same clock here as you do for your Register File.</li>
+  <li>"sel" determines whether or not the RAM module is active.  We will probably not run into any cases where we need to turn our RAM off, so you can wire a constant 1 to this.</li>
+  <li>"A" chooses which address will be accessed.</li>
+  <li>"clr" will instantly set all contents of memory to 0 if high. You should wire a manual switch (Input/Output <tt>--&gt;</tt> Button) so you can clear out memory whenever you want to restart a test.</li>
+  <li>"ld" determines whether we are reading or writing to 
+memory. If "ld" is high, then "D" will be driven with the contents of memory at address "A" (left image). If "ld" is low, then the contents of "D" will be stored in memory at address "A" (right image).</li>
+  <li>"D" acts as both data in and data out for this module. This means you have to be careful not to drive this line from two conflicting sources, which in this case are DataIn and the output of the memory. You can solve this by using a controlled buffer (a.k.a. a tri-state buffer) on the "D" port of the RAM module. By wiring logic to the "ld" port and the valve 
+port of the controlled buffer together so that they are always 
+opposite values (as in the pictures above), we can prevent conflicts between data being driven in and the contents of memory coming out.</li>
+  <li>The "poke" tool can be used to modify the contents of the memory. You can also use right-click <tt>--&gt;</tt> Load Image... to load an image from a file.</li>
+</ul>
+
+<p>
+The best way to learn how these work is simply to play with them.
+You can also refer to Logisim documentation on RAM modules <a href="http://ozark.hendrix.edu/~burch/logisim/docs/2.1.0/libs/mem/ram.html">here</a>.
+</p>
+</div>
+
+
+<h3>3b) <a id="deliv4link" class="toggle" href="javascript:toggle(4);">Output Devices [show]</a></h3>
+<div id="deliv4body" style="display: none">
+<p>
+Remember that the five components of a computer are control, datapath, memory, input, and output devices.
+Unfortunately, we won't have much input besides loading to memory.
+But we will have a cool output device using hex digit displays in Logisim.
+</p>
+
+<p>We provide for you a <a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/Converter.circ">converter circuit</a> (right click and save as, also at ~cs61c/proj4StartKit/Converter.circ) 
+that converts 16 bits into 4 hex digits, which are displayed on a "bundle" of four 7-segment LEDs. Documentation for the converter is included
+inside Converter.circ. Just open it in Logism. Each bundle should look like the following:</p> <img src="./Project 4  Processor Design_files/display_bundle.png">
+	
+<p>Alternatively, you may use the new hex displays in Logisim.</p>
+       
+    <p>Your project must include an array of at least two of these
+    display "bundles" for output, in the top level of <tt>cpu.circ</tt>. 
+    You may wish to add more so you 
+    can have more interesting output, but we will only require two. 
+    Remember that the <tt>disp</tt> instruction takes the value in
+    $rs and displays it on the <tt>imm</tt>th "bundle". This means
+    you will only care about as many immediate values as you have
+    display bundles to show them on. You should connect the values being
+    displayed on the first two display bundles to the d0 and d1 outputs of
+    your processor.</p>
+    
+    <p>Your bundles must display 0000 before any
+    disp instructions have been executed.<br><br>
+
+    They must hold their values until another disp instruction replaces
+    the value in that bundle.<br><br>
+    
+    For example:
+    </p><pre>    andi $r0, $r0, 0x0000
+    disp $r0, 0   # After this instruction, DISP[0] should show 0000
+
+    ori $r0, $r0, 0x1   # DISP[0] should still show 0000
+    add $r0, $r0, $r0   # DISP[0] should stlll show 0000
+
+    disp $r0, 0   # DISP[0] should now show 0002
+    </pre>
+
+    This means you <span style="color:red; font-weight:bold;">will need to add some form of state</span> for each
+    display bundle. The value on the display should update at the rising
+    edge of the clock cycle.
+<p>
+</p><p>
+You also need to have an <span style="color:red; font-weight:bold;">LED unit</span> which lights up to signify <em>signed</em> overflow.
+This indicator should be wired to the signed overflow port of your ALU.
+This should be viewable in your main circuit.
+</p>
+</div>
+
+
+<h3>4) <a id="deliv5link" class="toggle" href="javascript:toggle(5);">Test Code [show]</a></h3>
+<div id="deliv5body" style="display: none">
+<p>Since you are building a processor, you can run actual programs on it!</p>
+<p>
+There are more details about testing your processor and the provided assembler in the <a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#testing">Testing</a> section, but in particular you will be REQUIRED to write and submit the following two programs:
+</p>
+
+<ol>
+  <!--
+  <li>Write a program that multiplies the first two 16-bit words of memory (<tt>MEM[0]</tt> and <tt>MEM[1]</tt>) and stores their product in <tt>MEM[2]</tt>.
+You may treat <tt>MEM[0]</tt> and <tt>MEM[1]</tt> as unsigned values and assume MEM[1] != 0. 
+Do not worry about the case where the product does not fit in 16 bits.
+The last instruction of your program must be a <tt>halt</tt> (an instruction that jumps or branches to itself indefinitely).
+Feel free to clobber the original arguments.
+Save the assembler source in a file <tt>mult.s</tt>.</li>
+-->
+  <li>Write a program that multiplies the first two 16-bit words of memory (MEM[0] and MEM[1]) and stores their product in MEM[2]. You may treat MEM[0] and MEM[1] as unsigned values. Also, do not worry about the case where the product does not fit in 16 bits. The last instruction of your program must be a <tt>halt</tt> (an instruction that jumps or branches to itself indefinitely). Feel free to clobber the original arguments. Save the assembler source in a file <tt>mult.s.</tt></li>
+  <li>Write a program that displays the lower nine bits of the 
+first 16-bit word of memory in octal (base 8) on Display Bundle 0.  For example, if the first 16-bit word were <tt>0x829f</tt>, the hex digit displays would read <tt>0237</tt>.  Again, you may clobber any memory values you like.  Save the assembler source in a file <tt>octal.s</tt>.</li>
+</ol>
+
+<p>
+Write these functions as you would a normal MIPS function, remembering to stay within your processor's <a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#isa">ISA</a>.
+<del>Assume the function is called from <tt>main</tt> somewhere else in the program using <tt>jal mod</tt> or <tt>jal octal</tt>, meaning your function must end with a call to <tt>jr</tt></del>.
+You cannot assume anything about the values in the registers when your function is called and remember that all four registers can be freely changed.
+It is recommended that you write your own <tt>main</tt> functions to set up Data Memory and use the Display Bundles as desired while writing and testing your code, though your submitted code should contain ONLY the functions themselves.
+</p>
+<p>
+We will test your code by appending it to our own <tt>main</tt> functions for different test cases, assembling using <tt>assembler.py</tt>, and then running it on both your submitted processor and a known working processor.
+This is why it is important that you include only your function and not other testing statements.
+Our <tt>main</tt> functions will all end in a <tt>halt</tt> (an instruction that jumps or branches to itself indefinitely - see <a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#testing">Testing</a> for details) in order to avoid executing your code an extra time.
+Feel free to set something similar up when testing your own code.
+</p>
+
+</div>
+
+
+<h3>*) <a id="deliv6link" class="toggle" href="javascript:toggle(6);">Extra for Experts [show]</a></h3>
+<div id="deliv6body" style="display: none">
+<p>Currently, these extras are not for credit...
+<br>Once you've got your processor up and running, give these a try: (<b>BACKUP</b> your completed processor first)</p>
+
+<ul>
+  <li>Add more instructions.  For instance, <tt>jalr</tt> into <tt>$r3</tt>.</li>
+  <li>Implement <tt>SIMD add</tt> and <tt>SIMD sub</tt> instructions that treat registers as two 8-bit values.</li>
+  <li>Add more features to the assembler (and send it to us so
+ we can use it!)</li>
+  <li>Write a program that can run on your processor to use the displays in an interesting way.</li>
+  <li>For more display freedom, you can use a 7-segment display, which will not restrict you to only outputting hex characters.  Create a separate display instruction to use the 7-segment displays.</li>
+</ul>
+</div>
+
+
+        
+<hr>
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#updates">Updates</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#overview">Overview</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#deliverables">Deliverables</a> |
+ISA |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#logisim">Logisim</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#testing">Testing</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#submit">Submission</a>
+<hr>
+<a name="isa" id="isa"></a>
+<h2>Instruction Set Architecture (ISA)</h2>
+
+<p>
+You will be implementing a simple 16-bit processor with four registers ($r0-$r3).
+It will have separate data and instruction memory.
+<b>Because this is a 16-bit architecture, our words are 16 bits wide, unlike the 32-bit MIPS ISA we have been studying in class.
+For the remainder of this document, a WORD refers to 16 bits.</b>
+Each of the four registers is big enough to hold ONE word.
+</p>
+
+<p><b>IMPORTANT:</b> Because of the limitations of Logisim (and to make things simpler), our memories will be <b>word-addressed</b> (16 bits), unlike MIPS, which is byte-addressed (8 bits).</p>
+
+<p>
+The instruction encoding is given below.
+Your processor will pull out a 16-bit value from instruction memory and determine the meaning of that instruction by looking at the <tt>opcode</tt> (the top four bits, which are bits 15-12).
+If the instruction is an R-type (i.e. <tt>opcode == 0</tt>), then you must also look at the <tt>funct</tt> field.
+</p>
+        
+<p>
+Notice how we do not use all 16 possible opcodes, nor did we use all 64 R-type instructions.
+Your project only has to work on these specified instructions.
+This way the project is shorter and easier.
+</p>
+
+<table border="1">
+  <tbody><tr>
+    <th width="25">15-12</th>
+    <th width="25">11</th>
+    <th width="25">10</th>
+    <th width="25">9</th>
+    <th width="25">8</th>
+    <th width="25">7</th>
+    <th width="25">6</th>
+    <th width="25">5</th>
+    <th width="25">4</th>
+    <th width="25">3</th>
+    <th width="25">2</th>
+    <th width="25">1</th>
+    <th width="25">0</th>
+  </tr><tr>
+    <td align="center">0</td>
+    <td colspan="2" align="center">rs
+    </td><td colspan="2" align="center">rt
+    </td><td colspan="2" align="center">rd
+    </td><td colspan="6" align="center">funct
+    </td><td align="left">See R-type Instructions
+  </td></tr><tr>
+    <td align="center">1</td>
+    <td colspan="2" align="center">rs
+    </td><td colspan="2" align="center">rt
+    </td><td colspan="8" align="center">immediate (unsigned)
+    </td><td align="left"><tt>disp: DISP[imm] = $rs</tt>
+  </td></tr><tr>
+    <td align="center">2</td>
+    <td colspan="2" align="center">rs
+    </td><td colspan="2" align="center">rt
+    </td><td colspan="8" align="center">immediate (unsigned)
+    </td><td align="left"><tt>lui:&nbsp; $rt = imm &lt;&lt; 8</tt>
+
+  </td></tr><tr>
+    <td align="center">3</td>
+    <td colspan="2" align="center">rs
+    </td><td colspan="2" align="center">rt
+    </td><td colspan="8" align="center">immediate (unsigned)
+    </td><td align="left"><tt>ori:&nbsp; $rt = $rs | imm</tt>
+  </td></tr><tr>
+    <td align="center">4</td>
+    <td colspan="2" align="center">rs
+    </td><td colspan="2" align="center">rt
+    </td><td colspan="8" align="center">immediate (signed)
+    </td><td align="left"><tt>addi: $rt = $rs + imm</tt>
+  </td></tr><tr>
+    <td align="center">5</td>
+    <td colspan="2" align="center">rs
+    </td><td colspan="2" align="center">rt
+    </td><td colspan="8" align="center">immediate (unsigned)
+    </td><td align="left"><tt>andi: $rt = $rs &amp; imm</tt>
+  </td></tr><tr>
+    <td align="center">6</td>
+    <td colspan="12" align="center">target address
+    </td><td align="left"><tt>jal</tt> into <tt>$r3</tt>
+  </td></tr><tr>
+    <td align="center">7</td>
+    <td colspan="12" align="center">target address
+    </td><td align="left"><tt>j: &nbsp; &nbsp;</tt> jump to target address
+  </td></tr><tr>
+    <td align="center">8</td>
+    <td colspan="2" align="center">rs
+    </td><td colspan="10" align="center">unused
+    </td><td align="left"><tt>jr: &nbsp; PC = $rs</tt>
+  </td></tr><tr>
+    <td align="center">9</td>
+    <td colspan="2" align="center">rs
+    </td><td colspan="2" align="center">rt
+    </td><td colspan="8" align="center">offset (signed)
+    </td><td align="left"><tt>beq</tt>
+  </td></tr><tr>
+    <td align="center">10</td>
+    <td colspan="2" align="center">rs
+    </td><td colspan="2" align="center">rt
+    </td><td colspan="8" align="center">offset (signed)
+    </td><td align="left"><tt>bne</tt>
+  </td></tr><tr>
+    <td align="center">11</td>
+    <td colspan="2" align="center">rs
+    </td><td colspan="2" align="center">rt
+    </td><td colspan="8" align="center">immediate (signed)
+    </td><td align="left"><tt>lw: &nbsp; $rt = MEM[$rs + imm]</tt>
+  </td></tr><tr>
+    <td align="center">12</td>
+    <td colspan="2" align="center">rs
+    </td><td colspan="2" align="center">rt
+    </td><td colspan="8" align="center">immediate (signed)
+    </td><td align="left"><tt>sw: &nbsp; MEM[$rs+imm] = $rt</tt>
+  <!-- <tr> -->
+  <!--   <td align="center">13</td> -->
+  <!--   <td colspan="2" align="center">rs -->
+  <!--   <td colspan="2" align="center">rt -->
+  <!--   <td colspan="8" align="center">immediate (signed) -->
+  <!--   <td align="left"><tt>slti: $rt = ($rs < imm) ? 1 : 0</tt> -->
+</td></tr></tbody></table>
+
+<br> <b>R-Type Instructions</b>
+
+<table border="1">
+  <tbody><tr>
+    <th width="50">funct</th>
+    <th>Instruction</th>
+  </tr><tr>
+    <td align="center">0
+    </td><td align="left"><tt>or: &nbsp; $rd = $rs | $rt</tt>
+  </td></tr><tr>
+    <td align="center">1
+    </td><td align="left"><tt>and:&nbsp; $rd = $rs &amp; $rt</tt>
+  </td></tr><tr>
+    <td align="center">2
+    </td><td align="left"><tt>add:&nbsp; $rd = $rs + $rt</tt>
+  </td></tr><tr>
+    <td align="center">3
+    </td><td align="left"><tt>sub:&nbsp; $rd = $rs - $rt</tt>
+  </td></tr><tr>
+    <td align="center">4
+    </td><td align="left"><tt>sllv: $rd = $rs &lt;&lt; $rt</tt>
+  </td></tr><tr>
+    <td align="center">5
+    </td><td align="left"><tt>srlv: $rd = $rs &gt;&gt; $rt</tt>
+  </td></tr><tr>
+    <td align="center">6
+    </td><td align="left"><tt>srav: $rd = $rs &gt;&gt; $rt</tt>
+  </td></tr><tr>
+    <td align="center">7
+    </td><td align="left"><tt>slt:&nbsp; $rd = ($rs &lt; $rt) ? 1 : 0</tt>
+</td></tr></tbody></table>
+
+        
+<p>Some specifics on selected instructions:</p>
+
+<h4>Shifting</h4>
+<ul><li>We will not test shift amounts greater than 15; behavior in this case is undefined.</li></ul>
+
+
+<h4>Jumping</h4>
+<ul>
+  <li>The argument to the <tt>jump</tt> and <tt>jal</tt> instructions is a pseudoabsolute address, similar to MIPS.
+The <tt>target address</tt> is an unsigned number representing the lower 12 bits of the next instruction to be executed.
+The upper four bits are taken from the current <tt>PC</tt>.
+We do <b>NOT</b> concatenate any zeroes to the bottom of our address like we would in MIPS.
+This is because our processor is word-addressed, so every possible address holds a valid 16-bit instruction:
+  </li>
+
+<pre>        nextPC = ("currPC" &amp; 0xF000) | target address</pre>
+
+  <li>Note that <tt>"currPC"</tt> is the <tt>PC</tt> of the jump instruction itself or one very near it.  We will be assuming small program sizes (&lt; 2<sup>10</sup> instructions) and will not be strictly enforcing <tt>currPC+1</tt> as it would be in MIPS.</li>
+  <li>Note that you should kill the next instruction after a <tt>jump</tt> or <tt>jal</tt> even if that is the instruction you are going to be jumping to.</li>
+  <li>On a <tt>jal</tt> the address of the next instruction should be written into <tt>$r3</tt>.  This is what we mean by "link into <tt>$r3</tt>".</li>
+</ul>
+
+
+<h4>Branching</h4>
+<ul>
+  <li>The argument to the <tt>beq</tt> and <tt>bne</tt> instructions is a <b>signed</b> offset relative to the next instruction to be executed if we don't take the branch, which is similar to MIPS. 
+Note that the address of this next instruction is <tt>PC+1</tt> rather than <tt>PC+4</tt> because our processor is word-addressed.
+Here, <tt>currPC</tt> means the address <em>of the branch instruction</em>.  
+We can write <tt>beq</tt> as the following:</li>
+
+        <pre>        if $rs == $rt
+                nextPC = currPC+1 + offset
+        else
+                increment PC like normal
+        </pre>
+
+  <li>Think!  There's a reason we write "<tt>increment PC like normal</tt>" here instead of just "<tt>currPC+1</tt>".</li>
+  <li>The <tt>bne</tt> instruction differs only by the test in the <tt>if</tt> statement: replace the <tt>==</tt> with <tt>!=</tt>.</li>
+  <li>Note that you should not kill the next instruction if the branch is not taken. If the branch is taken you should always kill.</li>
+</ul>
+
+
+<h4>Immediates</h4>
+<ul>
+  <li>Note that the <tt>immediate</tt> field is only 8 bits wide, so we must perform some kind of extension on it before passing it to the ALU.
+If an immediate is supposeed to be <b>unsigned</b>, be sure to <b>zero-extend</b> it.
+If an immediate is <b>signed</b>, be sure to <b>sign-extend</b> it.
+  </li>
+</ul>        
+
+<!-- <h4>Display</h4> -->
+<!-- <ul> -->
+<!--   <li>This is obviously not a standard MIPS instruction.</li> -->
+<!--   <li>The <tt>disp</tt> instruction takes the value in <tt>$rs</tt> and displays it on the <tt>imm</tt>-th "bundle". This means you will only care about as many immediate values as you have display bundles to show them on.  For example: -->
+<!--     <pre> -->
+<!--     andi $r0, $r0, 0x0000 -->
+<!--     disp $r0, 0   # After this instruction, DISP[0] should show 0000 -->
+
+<!--     ori $r0, $r0, 0x1   # DISP[0] should still show 0000 -->
+<!--     add $r0, $r0, $r0   # DISP[0] should stlll show 0000 -->
+
+<!--     disp $r0, 0   # DISP[0] should now show 0002 -->
+<!--     </pre></li> -->
+<!-- </ul> -->
+
+
+
+<hr>
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#updates">Updates</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#overview">Overview</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#deliverables">Deliverables</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#isa">ISA</a> |
+Logisim |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#testing">Testing</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#submit">Submission</a>
+<hr>
+<a name="logisim" id="logisim"></a>
+<h2>Logisim Notes</h2>
+<p>
+It is strongly recommended that you download and run Logisim on your local machine while developing your processor to avoid overwhelming the instructional machines.
+Though Logisim is relatively stable compared to prior semesters, it is still recommended that you save often and also make backup copies of your <tt>.circ</tt> files early and often.
+The official version of Logisim we will be using for evaluation is v2.7.1.
+</p>
+<p>
+If you are having trouble with Logisim, <b><i>RESTART IT and RELOAD your circuit!</i></b>
+Don't waste your time chasing a bug that is not your fault.
+However, if restarting doesn't solve the problem, it is more likely that the bug is a flaw in your project.
+Please post to Piazza about any crazy bugs that you find and we will investigate.
+</p>
+
+<h3>Things to Look Out For</h3>
+<ul>
+  <li>Do <b>NOT</b> gate the clock! This is very bad design practice when making real circuits, so we will discourage you from doing this by heavily penalizing your project if you gate your clock.</li>
+  <li><span style="color:red; font-weight:bold;">BE CAREFUL with copying and pasting from different Logisim windows.</span>
+Logisim has been known to have trouble with this in the past.</li>
+  <li>When you import another file (Project <tt>--&gt;</tt> Load Library <tt>--&gt;</tt> Logisim Library...), it will appear as a folder in the left-hand viewing pane.</li>
+  <li>Changing attributes <em>before</em> placing a component changes the default settings for that component.  So if you are about to place many 16-bit pins, this might be desireable.  If you only want to change that particular component, place it first before changing the attributes.</li>
+  <li>When you change the inputs &amp; outputs of a sub-circuit that you have already placed in <tt>main</tt>, Logisim will automatically add/remove the ports when you return to <tt>main</tt> and this sometimes shifts the block itself.  If there were wires attached, Logisim will do its automatic moving of these as well, which can be extremely dumb in some cases.  Before you change the inputs and outputs of a block, it can sometimes be easier to first disconnect all wires from it.</li>
+  <li>Error signals (red wires) are obviously bad, but they tend to appear in complicated wiring jobs such as the one you will be implementing here.  It's good to be aware of the common causes while debugging:<br><br><img src="./Project 4  Processor Design_files/error_wire.png"></li>
+</ul>
+
+<h3>Logisim's Combinational Analysis Feature</h3>
+<p>
+Logisim offers some functionality for automating circuit implementation given a truth table, or vice versa.
+Though not disallowed (enforcing such a requirement is impractical), use of this feature is discouraged.
+Remember that you will not be allowed to have a laptop running Logisim on the final.
+</p>
+
+
+
+<hr>
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#updates">Updates</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#overview">Overview</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#deliverables">Deliverables</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#isa">ISA</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#logisim">Logisim</a> |
+Testing |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#submit">Submission</a>
+<hr>
+<a name="testing"></a>
+<h2>Testing</h2>
+<p>
+Once you've implemented your processor, you can test its correctness by writing programs to run on it!
+First, try this simple program as a sanity check: <tt>halt.s</tt>.
+This program loads the same immediate into two different registers using <tt>lui</tt>/<tt>ori</tt> and then branches back one instruction (<tt>offset = -1</tt>) if these registers are equal.
+</p>
+<pre>         Assembly:              Binary:
+         ========               ======
+         lui $r0, 0x33          2033
+         ori $r0, $r0, 0x44     3044
+         lui $r1, 0x33          2133
+         ori $r1, $r1, 0x44     3544
+   self: beq $r0, $r1, self     91FF
+</pre>
+
+<p>
+For practice, verify that the assembly on the left matches the translated binary on the right.
+This program effectively "halts" the processor by putting it into an infinite loop, so you can observe the outputs as well as memory and register state.
+Of course, you could do this "halt" with only the <tt>beq</tt> line, but it is very important that you test your <tt>lui</tt>/<tt>ori</tt> or the programs we will use during grading will not work.
+</p>
+<p>
+To test your processor, open the <tt>cpu-harness.circ</tt>.
+Find the Instruction Memory ROM and right click <tt>--&gt;</tt> Load Image...
+Select the assembled program (<tt>.hex</tt> file - see details on the Assembler below) to load it and then start clock ticks.
+</p>
+<p>
+As described in the <a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#deliverables">Deliverables</a>, you are <b>REQUIRED</b> to write and submit two sample programs to test your processor (<tt>mult.s</tt> and <tt>octal.s</tt>), but you should also write others to test all your instructions.</p>
+<p><b>Remember:</b> Debugging Sucks. Testing Rocks.</p>
+
+<p>
+We have provided an autograder with a strict subset of the tests that we will run on your processor.
+Passing all of our tests is <em>not</em> a guarantee that your processor is bug-free.
+</p>
+
+
+<a name="asm" id="asm"></a>
+<h3>Assembler</h3>
+<p>
+We've provided a basic assembler to make writing your programs easier so you can use assembly instead of machine code.
+You should try writing a few by hand before using this, mainly because it's good practice and makes you feel cooler.
+This <a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/assembler.py">assembler.py</a> supports all of the instructions for your processor.
+</p>
+<!--
+<ul>
+  <li>The standard <a href="assembler.py">assembler.py</a> supports all of the instructions for your processor as well as the pseudoinstructions <tt>li</tt> and <tt>la</tt>.</li>
+  <li><a href="crissmanAssembler.py">crissmanAssembler.py</a> has all kinds of magic, including producing data memory images and the requisite directives, courtesy of Charley Crissman.</li>
+</ul>
+-->
+<p>
+The assembler is included in the start kit (<tt>~cs61c/proj4StartKit</tt>) or can be downloaded from the link above.
+The standard assembler is a work in progress, so please report bugs to Piazza!
+</p>
+<p>The assembler takes files of the following form (this is <tt>halt.s</tt>, which is included in the start kit):</p>
+
+<pre>      lui $r0, 51
+      ori $r0, $r0, 68
+      lui $r1, 51
+      ori $r1, $r1, 68
+self: beq $r0, $r1, self
+</pre>
+        
+<p>
+Anywhere a register is required, it must be either <tt>$r0</tt>, <tt>$r1</tt>, <tt>$r2</tt>, or <tt>$r3</tt>.
+Commas are optional but the '<tt>$</tt>' is not.
+'<tt>#</tt>' starts a comment.
+The assembler can be invoked with the following command:
+</p>
+<pre>   $ python assembler.py input.s [-o output.hex]</pre>
+<p>
+The output file is <tt>input.hex</tt> if not explicitly set - that is, the same name as the input file but with a <tt>.hex</tt> extension.
+Use the <tt>-o</tt> option to change the output file name arbitrarily.
+</p>
+
+
+
+<hr>
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#updates">Updates</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#overview">Overview</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#deliverables">Deliverables</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#isa">ISA</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#logisim">Logisim</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#testing">Testing</a> |
+Submission
+<hr>
+<a name="submit"></a>
+<h2>Submission</h2>
+<p>You must submit the following files:</p>
+<pre>   Regfile.circ
+   alu.circ
+   cpu.circ
+   mult.s
+   octal.s
+</pre>
+<p>
+We will be using our own versions of the <tt>*-harness.circ</tt> files, so you do not need to submit those.
+In addition, you should not depend on any changes you make to those files.
+</p>
+<p style="color:red; font-weight:bold;">
+You must also submit any <tt>.circ</tt> files that you use in your solution (they are not copied into your <tt>.circ</tt> file when you import them, only referenced).
+Make sure you submit every <tt>.circ</tt> file that is part of your project!
+You might want to test your <tt>cpu.circ</tt> file on the lab machines before you submit it, to make sure you got everything.</p>
+
+<p>From the directory containing your project files, submit using the following command:</p>
+<pre>   % submit proj4</pre>
+
+<p style="color:red; font-weight:bold;">
+Remember that if <tt>submit</tt> fails, your assignment has <em>not</em> been submitted.
+If <tt>submit</tt> does not ask you to confirm submitting a particular file, that file has <em>not</em> been submitted.
+If we cannot make sense of your submission, there is nothing we can do.
+Sorry.
+</p>
+
+<h2>Grading</h2>
+<p>
+Even though you are submitting your files by the deadline, grading for this project will actually be done in-person.
+You will be sitting down with a staff member (instructor, TA, or reader) and you will be asked to "show off" your processor through some manual and autograded tests.
+</p>
+<p>
+As noted above, failure to submit files will incur massive penalties on top of the late penalty so you want to avoid this at all costs.  Failure to sign up for or attend your face-to-face will result in a score of 0.
+</p>
+
+
+<hr>
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#updates">Updates</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#overview">Overview</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#deliverables">Deliverables</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#isa">ISA</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#logisim">Logisim</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#testing">Testing</a> |
+<a href="http://inst.eecs.berkeley.edu/~cs61c/fa11/assignments/proj4/#submit">Submission</a>
+<hr>
+
+
+
+
+
+</div></body></html>

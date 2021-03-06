@@ -1,9 +1,11 @@
+require 'set'
 require 'socket'
 require 'json'
 require 'optparse'
+require 'io/console'
 
 class Ship
-  attr_accessor :type
+attr_accessor :type, :x, :y, :dir, :being_placed
   SHIP_SIZES = {
     'carrier' => 5,
     'battleship' => 4,
@@ -22,14 +24,21 @@ class Ship
     'undamaged' => 32,
     'damaged' => 33,
     'sunk' => 35,
+    'placing' => 36,
   }
 
-  def initialize(type, location, dir)
+  def initialize(type, location, dir, being_placed=false)
     @type = type
     @x = location[0]
     @y = location[1]
     @dir = dir
     @hp = SHIP_SIZES[@type]
+    @being_placed = being_placed
+  end
+
+  def set_coords(x, y)
+    @x = x
+    @y = y
   end
 
   def size
@@ -46,6 +55,10 @@ class Ship
 
   def is_sunk?
     @hp <= 0
+  end
+
+  def is_placing?
+    @being_placed
   end
 
   def coord_pairs
@@ -69,6 +82,8 @@ class Ship
       "sunk"
     elsif self.is_damaged?
       "damaged"
+    elsif self.is_placing?
+      "placing"
     else
       "undamaged"
     end
@@ -93,6 +108,7 @@ class BattleshipPlacement
     @height = height
     @ship_data = []
     @board_data = {}
+    @active_ship = nil
   end
 
   def place_ships_randomly!
@@ -106,11 +122,74 @@ class BattleshipPlacement
     end
   end
 
+  INPUT_MAP = {
+    "j" => "left",
+    "k" => "down",
+    "l" => "right",
+    "i" => "up",
+    "r" => "rotate",
+    "\r" => "enter",
+  }
+  def get_input
+    char = nil
+    while !INPUT_MAP.keys.include?(char)
+      char = STDIN.getch
+      exit(1) if char == "\u0003"
+    end
+    INPUT_MAP[char]
+  end
+
+  def move_active_ship(dir)
+    new_x = @active_ship.x + (dir == "right" ? 1 : (dir == "left" ? -1 : 0))
+    new_y = @active_ship.y + (dir == "down" ? 1 : (dir == "up" ? -1 : 0))
+    x_max = (@active_ship.dir == 'down' ? @width - 1 : @width - @active_ship.size)
+    y_max = (@active_ship.dir == 'right' ? @height - 1 : @height - @active_ship.size)
+    if new_x >= 0 && new_x <= x_max && new_y >= 0 && new_y <= y_max
+      @active_ship.set_coords(new_x, new_y)
+    end
+  end
+  def rotate_active_ship(dir)
+    if dir == "right" || dir == "down"
+      tail_x = (dir == 'down' ? @active_ship.x : @active_ship.x + @active_ship.size)
+      tail_y = (dir == 'right' ? @active_ship.y : @active_ship.y + @active_ship.size)
+      if tail_x >= 0 && tail_x <= @width && tail_y >= 0 && tail_y <= @height
+        @active_ship.dir = dir
+      end
+    end
+  end
+
+  DIRECTIONS = %w{ left right down up }
+  INSTRUCTIONS = "Use j,k,l,i to move the ship.\nUse r to rotate it.\nPress enter to place it."
+  def run_player_setup
+    SHIPS.each do |type|
+      @active_ship = Ship.new(type, [0, 0], "right", true)
+      error = ""
+      loop do
+        system('clear')
+        puts self
+        puts INSTRUCTIONS
+        puts error
+        input = self.get_input()
+        if DIRECTIONS.include?(input)
+          self.move_active_ship(input)
+          error = ""
+        elsif input == "rotate"
+          self.rotate_active_ship(@active_ship.dir == "right" ? "down" : "right")
+          error = ""
+        elsif input == "enter"
+          break if self.place_ship(@active_ship)
+          error = "Intersecting another ship. Please move it and try again."
+        end
+      end
+    end
+  end
+
   # returns true if successful, false otherwise
   def place_ship(ship)
     # Check for intersection with existings ships
     coords = ship.coord_pairs
     if !coords.any? { |c| @board_data[c] }
+      ship.being_placed = false
       @ship_data << ship
       coords.each { |c| @board_data[c] = ship }
       true
@@ -128,23 +207,23 @@ class BattleshipPlacement
   end
 
   def to_s
-    titles = ["My ships".center((@width * 4) + 1), "Past guesses".center((@width * 4) + 1)].join("    |  ") + "\n"
-    titles_spacer = "#{' '*((@width * 4) + 1)}    |  #{' '*((@width * 4) + 1)}\n"
-    top_nums_board = " #{(1..10).map { |i| i.to_s.center(3) }.join(" ")} "
-    top_nums = [top_nums_board, top_nums_board].join("    |  ") + "\n"
-    top_and_bot_boarder_board = "-" * ((@width * 4) + 1)
-    top_and_bot_boarder = [top_and_bot_boarder_board, top_and_bot_boarder_board].join("    |  ") + "\n"
-    board_sep = ('|' * (@width + 1)).split('').join("-" * 3)
-    row_sep = [board_sep, board_sep].join("    |  ") + "\n"
+    titles = "Ship placement".center((@width * 4) + 1) + "\n"
+    titles_spacer = "#{' '*((@width * 4) + 1)}\n"
+    top_nums = " #{(1..10).map { |i| i.to_s.center(3) }.join(" ")} \n"
+    top_and_bot_boarder = "-" * ((@width * 4) + 1) + "\n"
+    board_sep = ('|' * (@width + 1)).split('').join("-" * 3) + "\n"
+    active_ship_set = Set.new(@active_ship.coord_pairs)
     middle = (0...@height).map { |y|
       ship_row = (0...@width).map { |x|
-        " #{((ship = @board_data["#{x}-#{y}"]) ? ship.to_s : " ")} "
+        cur_coord = "#{x}-#{y}"
+        ship = @board_data[cur_coord]
+        if active_ship_set.include?(cur_coord)
+          ship = (ship.nil? ? @active_ship : "\e[31mX\e[0m")
+        end
+        " #{ship.nil? ? " " : ship} "
       }.join("|")
-      guess_row = (0...@width).map { |x|
-        " #{((ship = @board_data["#{x}-#{y}"]) ? ship.to_s : " ")} "
-      }.join("|")
-      "|#{ship_row}| #{(65 + y).chr}  |  |#{ship_row}| #{(65 + y).chr}\n"
-    }.join(row_sep)
+      "|#{ship_row}| #{(65 + y).chr}\n"
+    }.join(board_sep)
     [titles, titles_spacer, top_nums, top_and_bot_boarder, middle, top_and_bot_boarder].join
   end
 end
@@ -284,7 +363,6 @@ class Game
   end
 end
 
-
 options = {
   width: 10,
   height: 10,
@@ -295,34 +373,51 @@ options = {
 }
 OptionParser.new do |opts|
   opts.banner = "Usage: ./battleships.rb [options]"
+
   opts.on("-d[DIMENSIONS]", "--dimensions=[DIMENSIONS]", "Specify board 'WIDTHxHEIGHT'. Default is '10x10'.") do |d|
     puts d
     arr = d.split("x").map(&:to_i)
     options[:width] = arr[0]
     options[:height] = arr[1]
   end
+
   opts.on("-s", "--server", "Set to launch the server") do |s|
     options[:is_server] = true
   end
+
   opts.on("-p[PORT]", "--port=[PORT]", "Set the port to launch on. Default is 2000.") do |p|
     options[:port] = p.to_i
   end
+
   opts.on("-i[IP]", "--ip=[IP]", "Set the ip to connect to. Default is localhost.") do |ip|
     options[:server_ip] = ip
   end
+
   opts.on("-e", "--example", "Set to play an example game.") do |s|
     options[:example] = true
   end
+
   opts.on("-h", "--help", "Prints this help") do |h|
     puts opts
     exit
   end
 end.parse!
 
+def make_and_do_placement(width, height)
+  b = BattleshipPlacement.new(width, height)
+  print "Do manual placement? ([Y]/N) "
+  yes_no = STDIN.gets.chomp.downcase
+  if yes_no.include?("y") || yes_no == ""
+    b.run_player_setup()
+  else
+    b.place_ships_randomly!
+  end
+  b
+end
+
 if options[:example]
-  b1 = BattleshipPlacement.new(options[:width], options[:height])
+  b1 = make_and_do_placement(options[:width], options[:height])
   b2 = BattleshipPlacement.new(options[:width], options[:height])
-  b1.place_ships_randomly!
   b2.place_ships_randomly!
   game = Game.new([b1.get_ships, b2.get_ships], options[:width], options[:height], 0)
   system('clear')
@@ -377,16 +472,20 @@ if options[:is_server]
   socket = server.accept    # Wait for a client to connect
 
   puts "Player connected"
-  puts "Creating random ship configuration"
-  b = BattleshipPlacement.new(options[:width], options[:height])
-  b.place_ships_randomly!
-  starting_player = rand(1)
-
   puts "Sendings game details"
+  starting_player = rand(1)
   socket.puts({
     "width" => options[:width],
     "height" => options[:height],
-    "ships" => b.as_hash, "starting_player" => ((starting_player + 1) % 2)
+    "starting_player" => ((starting_player + 1) % 2)
+  }.to_json)
+
+  puts "Starting ship configuration."
+  b = make_and_do_placement(options[:width], options[:height])
+
+  puts "Sendings ship details"
+  socket.puts({
+    "ships" => b.as_hash,
   }.to_json)
 
   puts "Getting client ships"
@@ -411,15 +510,19 @@ else
 
   puts "Connected to server. Getting game details."
   game_details = JSON.parse(socket.gets.chomp)
-  server_ships = game_details["ships"].map { |s| Ship.new(s["type"], s["coord"], s["dir"]) }
 
   puts "Got game details from server."
-  puts "Creating random ship configurations."
-  b = BattleshipPlacement.new(game_details["width"], game_details["height"])
-  b.place_ships_randomly!
+  puts "Starting ship configuration."
+  b = make_and_do_placement(game_details["width"], game_details["height"])
 
+  puts "Done with ship configuration."
+  puts "Getting ship data from server."
+  game_details = game_details.merge(JSON.parse(socket.gets.chomp))
+  server_ships = game_details["ships"].map { |s| Ship.new(s["type"], s["coord"], s["dir"]) }
+
+  puts "Got ship details from server."
   puts "Sending ships to server"
-  socket.puts b.as_hash.to_json
+  socket.puts(b.as_hash.to_json)
   game = Game.new(
     [b.get_ships, server_ships],
     game_details["width"],

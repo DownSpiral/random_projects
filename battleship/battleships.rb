@@ -23,6 +23,7 @@ class Ship
     'damaged' => 33,
     'sunk' => 35,
   }
+
   def initialize(type, location, dir)
     @type = type
     @x = location[0]
@@ -30,18 +31,23 @@ class Ship
     @dir = dir
     @hp = SHIP_SIZES[@type]
   end
+
   def size
     SHIP_SIZES[@type]
   end
+
   def hit
     @hp -= 1
   end
+
   def is_damaged?
     @hp > 0 && @hp < SHIP_SIZES[@type]
   end
+
   def is_sunk?
     @hp <= 0
   end
+
   def coord_pairs
     if @dir == "right"
       (@x...@x+self.size).map { |x| [x, @y].join("-") }
@@ -49,6 +55,7 @@ class Ship
       (@y...@y+self.size).map { |y| [@x, y].join("-") }
     end
   end
+
   def as_hash
     {
       type: @type,
@@ -56,6 +63,7 @@ class Ship
       dir: @dir,
     }
   end
+
   def status
     if self.is_sunk?
       "sunk"
@@ -65,6 +73,7 @@ class Ship
       "undamaged"
     end
   end
+
   def to_s
     "\e[#{SHIP_COLORS[self.status]}m#{SHIP_CHARS[@type]}\e[0m"
   end
@@ -78,12 +87,14 @@ class BattleshipPlacement
     'submarine',
     'destroyer'
   ]
+
   def initialize(width, height)
     @width = width
     @height = height
     @ship_data = []
     @board_data = {}
   end
+
   def place_ships_randomly!
     SHIPS.each do |type|
       loop do
@@ -94,6 +105,7 @@ class BattleshipPlacement
       end
     end
   end
+
   # returns true if successful, false otherwise
   def place_ship(ship)
     # Check for intersection with existings ships
@@ -106,12 +118,15 @@ class BattleshipPlacement
       false
     end
   end
+
   def get_ships
     @ship_data
   end
+
   def as_hash
     @ship_data.map(&:as_hash)
   end
+
   def to_s
     titles = ["My ships".center((@width * 4) + 1), "Past guesses".center((@width * 4) + 1)].join("    |  ") + "\n"
     titles_spacer = "#{' '*((@width * 4) + 1)}    |  #{' '*((@width * 4) + 1)}\n"
@@ -136,6 +151,7 @@ end
 
 class Player
   attr_accessor :guesses, :ships, :board_info, :id
+
   def initialize(id, ships)
     @id = id
     @ships = ships
@@ -144,6 +160,7 @@ class Player
       ship.coord_pairs.each { |c| hash[c] = ship }
     }
   end
+
   def is_dead?
     @ships.all? { |s| s.is_sunk? }
   end
@@ -158,24 +175,31 @@ class Game
     @players = player_ships.map.with_index { |ships, i| Player.new(i, ships) }
     @current_player_index = starting_player
   end
+
   def active_player
     @players.first
   end
+
   def is_active_players_turn?
     @current_player_index == 0
   end
+
   def opponent
     @players.last
   end
+
   def current_player
     @players[@current_player_index]
   end
+
   def next_player
     @players[(@current_player_index + 1) % @players.length]
   end
+
   def prev_player
     @players[@current_player_index - 1]
   end
+
   def parse_guess(guess)
     if !(m = /\A([A-J])(\d+)\z/.match(guess)).nil?
       letter = m[1]
@@ -190,9 +214,11 @@ class Game
       nil
     end
   end
+
   def move_already_made?(move)
     !self.current_player.guesses[move.join("-")].nil?
   end
+
   def make_move(move)
     enemy_ship = self.next_player.board_info[move.join("-")]
     result = if enemy_ship.nil?
@@ -211,15 +237,19 @@ class Game
     @current_player_index = (@current_player_index + 1 ) % @players.length
     result
   end
+
   def alive_players
     @players.reject { |p| p.is_dead? }
   end
+
   def is_over?
     self.alive_players.length == 1
   end
+
   def self.move_arr_to_s(move)
     (65 + move[1]).chr + (move[0] + 1).to_s
   end
+
   GUESS_COLORS = {
     'X' => 31,
     'S' => 35,
@@ -319,7 +349,7 @@ if options[:example]
       puts result
     end
 
-    # make player one move
+    # make player two move
     if move.nil?
       puts "Invalid guess. Move must be a letter followed immediately by a number (e.g. A7)"
     elsif game.move_already_made?(move)
@@ -342,22 +372,27 @@ socket = nil
 if options[:is_server]
   puts "Starting server on port #{options[:port]}"
   server = TCPServer.new options[:port]
+
   puts "Waiting for another player"
   socket = server.accept    # Wait for a client to connect
+
   puts "Player connected"
   puts "Creating random ship configuration"
   b = BattleshipPlacement.new(options[:width], options[:height])
   b.place_ships_randomly!
   starting_player = rand(1)
+
   puts "Sendings game details"
   socket.puts({
     "width" => options[:width],
     "height" => options[:height],
     "ships" => b.as_hash, "starting_player" => ((starting_player + 1) % 2)
   }.to_json)
+
   puts "Getting client ships"
   client_ship_hashes = JSON.parse(socket.gets.chomp)
   client_ships = client_ship_hashes.map { |s| Ship.new(s["type"], s["coord"], s["dir"]) }
+
   puts "Got client ships"
   game = Game.new(
     [b.get_ships, client_ships],
@@ -376,10 +411,12 @@ else
   puts "Connected to server. Getting game details."
   game_details = JSON.parse(socket.gets.chomp)
   server_ships = game_details["ships"].map { |s| Ship.new(s["type"], s["coord"], s["dir"]) }
+
   puts "Got game details from server."
   puts "Creating random ship configurations."
   b = BattleshipPlacement.new(game_details["width"], game_details["height"])
   b.place_ships_randomly!
+
   puts "Sending ships to server"
   socket.puts b.as_hash.to_json
   game = Game.new(
@@ -412,7 +449,7 @@ while !game.is_over?
       end
     end
   else
-    # Other players move, so get input
+    # Other players move, so wait for input
     puts "Waiting for the other players move"
     move = JSON.parse(socket.gets.chomp)
     puts "Got move: #{Game.move_arr_to_s(move)}"
